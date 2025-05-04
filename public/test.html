@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API 테스트</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    button {
+      padding: 10px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 10px 0;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      min-height: 100px;
+    }
+  </style>
+</head>
+<body>
+  <h1>API 테스트</h1>
+  
+  <button id="updatePromptData">prompt-data.json 업데이트</button>
+  
+  <div id="result">
+    <p>결과가 여기에 표시됩니다.</p>
+  </div>
+  
+  <script>
+    document.getElementById('updatePromptData').addEventListener('click', async () => {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = '<p>API 호출 중...</p>';
+      
+      try {
+        const response = await fetch('/api/update-prompt-data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          resultDiv.innerHTML = `<p>성공: ${data.message}</p>`;
+        } else {
+          resultDiv.innerHTML = `<p>오류: ${data.error}</p>`;
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<p>오류 발생: ${error.message}</p>`;
+      }
+    });
+  </script>
+</body>
+</html> 
