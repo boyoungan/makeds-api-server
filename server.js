@@ -16,8 +16,8 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   : ['http://localhost:4000', 'http://127.0.0.1:4000', 'http://localhost:8080', 'http://127.0.0.1:8080'];
 
 // 미들웨어 설정
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // CORS 설정
 app.use(cors({
@@ -42,6 +42,8 @@ const purchaseOrderRouter = require('./routes/purchaseOrder');
 const calculateLeaveRouter = require('./routes/calculateLeave');
 const docChatRouter = require('./routes/docChat');
 const promptLibraryRouter = require('./routes/jekyll/promptLibrary');
+const changeDocTypeRouter = require('./routes/changedoctype');
+const quizManualRouter = require('./routes/quizManual');
 
 // API 라우트 등록
 app.use('/api/auth', authRouter);
@@ -51,6 +53,8 @@ app.use('/api/purchase-orders', purchaseOrderRouter);
 app.use('/api', calculateLeaveRouter);
 app.use('/api/docChat', docChatRouter);
 app.use('/api', promptLibraryRouter);
+app.use('/api', changeDocTypeRouter);
+app.use('/api', quizManualRouter);
 
 // 오류 처리 미들웨어
 const multer = require('multer');

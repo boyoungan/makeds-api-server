@@ -10,7 +10,8 @@ const { MemoryVectorStore } = require('langchain/vectorstores/memory');
 const { ChatGoogleGenerativeAI } = require('@langchain/google-genai');
 const { RetrievalQAChain } = require('langchain/chains');
 const pdf = require('pdf-parse');
-const { PromptTemplate } = require('@langchain/core/prompts');
+const ejs = require('ejs');
+const mammoth = require('mammoth');
 
 // 환경변수에서 API 키 가져오기
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
@@ -43,17 +44,14 @@ async function processDocument(filePath, fileName) {
       const pdfData = await pdf(dataBuffer);
       text = pdfData.text;
     }
-    // 텍스트 파일 처리
-    else if (['.txt', '.md', '.doc', '.docx'].includes(ext)) {
+    // 텍스트 파일 처리 (txt, md만)
+    else if (['.txt', '.md'].includes(ext)) {
       console.log(`[processDocument] 텍스트 파일 읽기 시작`);
-      
       // 인코딩 문제를 해결하기 위해 여러 인코딩 시도
       const iconv = require('iconv-lite');
       const buffer = await fs.readFile(filePath);
-      
       // 가능한 인코딩 목록
       const encodings = ['utf8', 'euc-kr', 'cp949', 'utf16le'];
-      
       // 각 인코딩 시도
       for (const encoding of encodings) {
         try {
@@ -65,11 +63,9 @@ async function processDocument(filePath, fileName) {
             // 다른 인코딩은 iconv-lite 사용
             decodedText = iconv.decode(buffer, encoding);
           }
-          
           // 디코딩 결과 확인
           const containsUnknownChars = decodedText.includes('\uFFFD') || /[\uFFFD]/.test(decodedText);
           const tooManyUnknownChars = (decodedText.match(/\uFFFD/g) || []).length > decodedText.length * 0.1;
-          
           if (!containsUnknownChars || !tooManyUnknownChars) {
             text = decodedText;
             console.log(`[processDocument] 성공적인 인코딩 감지: ${encoding}`);
@@ -79,7 +75,6 @@ async function processDocument(filePath, fileName) {
           console.log(`[processDocument] ${encoding} 디코딩 시도 실패:`, e.message);
         }
       }
-      
       // 모든 인코딩 시도 후에도 텍스트가 비어있다면
       if (!text || text.length === 0) {
         // fallback으로 CP949 강제 시도
@@ -90,8 +85,12 @@ async function processDocument(filePath, fileName) {
           console.error(`[processDocument] 모든 인코딩 시도 실패`);
         }
       }
-      
       console.log(`[processDocument] 텍스트 길이: ${text.length}, 일부 텍스트: ${text.substring(0, 100)}...`);
+    }
+    // doc, docx 파일은 mammoth로만 처리
+    else if ([".doc", ".docx"].includes(ext)) {
+      const result = await mammoth.extractRawText({ path: filePath });
+      text = result.value;
     }
     
     if (!text) {
@@ -577,31 +576,31 @@ exports.processChat = async (req, res) => {
     const finalDocs = combinedDocs.slice(0, 10);
     console.log(`[processChat] 최종 결합된 문서 수: ${finalDocs.length}`);
     
-    // LangChain의 PromptTemplate 가져오기
-    const { PromptTemplate } = require('@langchain/core/prompts');
-    
     // 검색 결과를 문맥으로 포함하는 프롬프트 생성
-    let contextText = '';
-    finalDocs.forEach((doc, idx) => {
-      contextText += `문서 청크 ${idx + 1}:\n${doc.pageContent}\n\n`;
-    });
-    
-    // 프롬프트 템플릿 생성
-    const promptTemplate = PromptTemplate.fromTemplate(
-      `${systemPrompt}
-      
-      다음은 문서에서 추출한 관련 정보입니다:
-      
-      ${contextText}
-      
-      질문: {query}
-      
-      위 문서 정보를 기반으로 질문에 답변해주세요. 문서에 명시된 내용만 사용하고, 문서에 없는 내용은 추가하지 마세요. 관련 정보가 없다면 '죄송합니다. 문서에서 관련 정보를 찾을 수 없습니다.'라고 답변해주세요.`
-    );
+    // EJS 템플릿 생성
+    const templateString = `
+<%= systemPrompt %>
+
+다음은 문서에서 추출한 관련 정보입니다:
+
+<% finalDocs.forEach(function(doc, idx) { %>
+문서 청크 <%= idx + 1 %>:
+<%= doc.pageContent %>
+
+<% }); %>
+
+질문: <%= query %>
+
+위 문서 정보를 기반으로 질문에 답변해주세요. 문서에 명시된 내용만 사용하고, 문서에 없는 내용은 추가하지 마세요. 관련 정보가 없다면 '죄송합니다. 문서에서 관련 정보를 찾을 수 없습니다.'라고 답변해주세요.
+    `;
     
     // LLM으로 답변 생성
     console.log(`[processChat] LLM 답변 생성 시작`);
-    const llmPrompt = await promptTemplate.format({ query: question });
+    const llmPrompt = ejs.render(templateString, {
+      systemPrompt: systemPrompt,
+      finalDocs: finalDocs,
+      query: question
+    });
     const llmResult = await llm.invoke(llmPrompt);
     const answer = llmResult.content;
     console.log(`[processChat] LLM 답변 생성 완료: ${answer.substring(0, 50)}...`);
@@ -647,22 +646,22 @@ exports.processChat = async (req, res) => {
 // 답변의 가독성을 개선하는 함수
 function formatAnswerForReadability(answer) {
   if (!answer) return '';
-  
   // 줄바꿈 처리 및 마크다운 서식 적용
   let formatted = answer
     // 문장 끝에서 줄바꿈 추가
     .replace(/\.\s+/g, '.\n\n')
-    // 목록 항목 강조
-    .replace(/^(\d+\.\s+)/gm, '**$1**')
+    // 이미 별표가 붙은 번호는 볼드 처리하지 않음, 별표 없는 번호만 볼드 처리
+    .replace(/^(?!\*+)(\d+\.\s+)/gm, '**$1**')
     .replace(/^(-\s+)/gm, '• ')
     // 중요 키워드 강조 (필요시 커스터마이즈)
     .replace(/(IT감사계획|감사|계획|리스크|통제)/g, '**$1**');
-  
   // 여러 줄바꿈 정리
   formatted = formatted.replace(/\n{3,}/g, '\n\n');
-  
   return formatted;
 }
+
+// EJS는 중괄호를 사용하지 않으므로 이스케이프 함수가 불필요합니다.
+// 필요시 HTML 이스케이프는 EJS 내에서 <%= %> 대신 <%- %>를 사용합니다.
 
 // 소스 내용을 적절한 길이로 자르고 가독성 개선
 function truncateAndFormat(content) {
