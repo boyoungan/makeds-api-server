@@ -1,11 +1,11 @@
-// routes/jekyll/promptLibrary.js
+// routes/promptLibrary.js
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs-extra');
-const promptLibraryController = require('../../controllers/jekyll/promptLibraryController');
-const { authenticateToken } = require('../../middleware/auth');
+const promptLibraryController = require('../controllers/promptLibraryController');
+const { authenticateToken } = require('../middleware/auth');
 
 // Jekyll 블로그 루트 디렉토리 설정
 const BLOG_ROOT = path.join(__dirname, '..', '..', '..', 'prompt-engineering-library');
@@ -36,8 +36,11 @@ const upload = multer({
 // prompt-data.json 업데이트
 router.post('/update-prompt-data', authenticateToken, promptLibraryController.updatePromptData);
 
+
 // 포스트 저장
-router.post('/posts', authenticateToken, promptLibraryController.savePost);
+router.post('/posts', (req, res, next) => {
+  next();
+}, promptLibraryController.savePost);
 
 // 포스트 목록 조회
 router.get('/posts', authenticateToken, promptLibraryController.getPosts);

@@ -25,6 +25,12 @@ app.use(cors({
   credentials: true
 }));
 
+// === 여기에 추가하세요! ===
+// app.use((req, res, next) => {
+//   console.log(`[API SERVER] ${req.method} ${req.originalUrl}`);
+//   next();
+// });
+
 // 정적 파일 서빙 설정
 app.use(express.static(path.join(__dirname, 'public')));
 const uploadsPath = path.join(__dirname, 'public', 'uploads');
@@ -41,7 +47,7 @@ const purchaseRequestRouter = require('./routes/purchaseRequest');
 const purchaseOrderRouter = require('./routes/purchaseOrder');
 const calculateLeaveRouter = require('./routes/calculateLeave');
 const docChatRouter = require('./routes/docChat');
-const promptLibraryRouter = require('./routes/jekyll/promptLibrary');
+const promptLibraryRouter = require('./routes/promptLibrary');
 const changeDocTypeRouter = require('./routes/changedoctype');
 const quizManualRouter = require('./routes/quizManual');
 
@@ -50,11 +56,12 @@ app.use('/api/auth', authRouter);
 app.use('/api/goods', goodsRouter);
 app.use('/api/purchase-requests', purchaseRequestRouter);
 app.use('/api/purchase-orders', purchaseOrderRouter);
-app.use('/api', calculateLeaveRouter);
+
+app.use('/api/promptLibrary', promptLibraryRouter);
+app.use('/api/calculate-leave', calculateLeaveRouter);
 app.use('/api/docChat', docChatRouter);
-app.use('/api', promptLibraryRouter);
-app.use('/api', changeDocTypeRouter);
-app.use('/api', quizManualRouter);
+app.use('/api/change-doc-type', changeDocTypeRouter);
+app.use('/api/quiz-manual', quizManualRouter);
 
 // 오류 처리 미들웨어
 const multer = require('multer');

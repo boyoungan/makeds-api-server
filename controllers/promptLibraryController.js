@@ -1,10 +1,11 @@
-// controllers/jekyll/promptLibraryController.js
+// controllers/promptLibraryController.js
 const fs = require('fs-extra');
 const path = require('path');
 const { exec } = require('child_process');
+const jwt = require('jsonwebtoken');
 
 // Jekyll 블로그 루트 디렉토리 설정
-const BLOG_ROOT = path.join(__dirname, '..', '..', '..', 'prompt-engineering-library');
+const BLOG_ROOT = path.join(__dirname, '..', 'data', 'prompt-library');
 
 // Front Matter 파싱 함수
 const parseFrontMatter = (content) => {
@@ -70,10 +71,12 @@ const updatePromptData = async () => {
     
     // _posts 디렉토리가 존재하는지 확인
     const postsExists = await fs.pathExists(postsDir);
+    console.log('[PromptLibraryController] postsExists:', postsExists);
     
     if (postsExists) {
       // _posts 디렉토리의 모든 마크다운 파일 읽기
       const files = await fs.readdir(postsDir);
+      console.log('[PromptLibraryController] files:', files);
       
       for (const file of files) {
         if (file.endsWith('.md')) {
@@ -82,8 +85,8 @@ const updatePromptData = async () => {
           const frontMatter = parseFrontMatter(content);
           
           // 프롬프트 데이터에 필요한 정보만 추출
-          // title과 model 필드가 모두 있는 경우에만 추가
-          if (frontMatter.title && frontMatter.model) {
+          // title 필드가 두 있는 경우 추가
+          if (frontMatter.title) {
             const uniqueTitle = `${frontMatter.title}`;
             
             // 파일명에서 사용할 수 없는 문자를 제거하거나 대체
@@ -210,9 +213,10 @@ exports.updatePromptData = async (req, res) => {
 
 // 포스트 저장 컨트롤러
 exports.savePost = async (req, res) => {
+  console.log('[PromptLibraryController] savePost 실행됨!');
   try {
     const { filename, content, isDraft } = req.body;
-    
+    console.log(`[PromptLibrary] POST /posts 저장 요청: filename=${filename}, isDraft=${isDraft}`);
     if (!filename || !content) {
       return res.status(400).json({ error: '파일명과 내용은 필수입니다.' });
     }
@@ -226,11 +230,14 @@ exports.savePost = async (req, res) => {
     const filePath = path.join(targetDir, filename);
   
     // 파일 저장
+    console.log('[PromptLibrary] 실제 저장 경로:', filePath);
     await fs.writeFile(filePath, content, 'utf8');
+    console.log(`[PromptLibrary] 파일 저장 완료: ${filePath}`);
     
     // prompt-data.json 파일 업데이트
     try {
       await updatePromptData();
+      console.log('[PromptLibrary] prompt-data.json 업데이트 완료');
     } catch (updateError) {
       console.error('포스트 저장 후 prompt-data.json 파일 업데이트 오류:', updateError);
       // 오류가 발생해도 포스트 저장은 계속 진행
@@ -261,6 +268,7 @@ exports.savePost = async (req, res) => {
 // 포스트 목록 조회 컨트롤러
 exports.getPosts = async (req, res) => {
   try {
+    // console.log('[PromptLibrary] GET /posts 요청');
     const postsDir = path.join(BLOG_ROOT, '_posts');
     const draftsDir = path.join(BLOG_ROOT, '_drafts');
     
@@ -269,9 +277,7 @@ exports.getPosts = async (req, res) => {
       fs.pathExists(postsDir),
       fs.pathExists(draftsDir)
     ]);
-    
     const posts = [];
-    
     // 발행된 포스트 가져오기
     if (postsExists) {
       const postFiles = await fs.readdir(postsDir);
@@ -296,6 +302,7 @@ exports.getPosts = async (req, res) => {
         if (file.endsWith('.md')) {
           const content = await fs.readFile(path.join(draftsDir, file), 'utf8');
           const frontMatter = parseFrontMatter(content);
+          console.log(`[PromptLibrary] 읽은 드래프트: ${file}, title: ${frontMatter.title}`);
           posts.push({
             filename: file,
             path: `_drafts/${file}`,
@@ -316,7 +323,7 @@ exports.getPosts = async (req, res) => {
     res.json({ posts });
     
   } catch (error) {
-    console.error('포스트 목록 조회 오류:', error);
+    // console.error('포스트 목록 조회 오류:', error);
     res.status(500).json({ error: '포스트 목록을 가져오는 중 오류가 발생했습니다.' });
   }
 };
@@ -395,4 +402,28 @@ exports.uploadFiles = async (req, res) => {
     console.error('파일 업로드 오류:', error);
     res.status(500).json({ error: '파일 업로드 중 오류가 발생했습니다.' });
   }
+};
+
+exports.authenticateToken = (req, res, next) => {
+  console.log('[Auth] 인증 미들웨어 진입');
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (!token) {
+    console.log('[Auth] 토큰 없음');
+    return res.status(401).json({ message: '인증 토큰이 필요합니다.' });
+  }
+  
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      console.log('[Auth] 토큰 검증 실패:', err);
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({ message: '토큰이 만료되었습니다. 다시 로그인해주세요.' });
+      }
+      return res.status(403).json({ message: '유효하지 않은 토큰입니다.' });
+    }
+    console.log('[Auth] 토큰 검증 성공');
+    req.user = user;
+    next();
+  });
 };
