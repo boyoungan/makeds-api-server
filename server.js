@@ -58,10 +58,10 @@ app.use('/api/purchase-requests', purchaseRequestRouter);
 app.use('/api/purchase-orders', purchaseOrderRouter);
 
 app.use('/api/promptLibrary', promptLibraryRouter);
-app.use('/api/calculate-leave', calculateLeaveRouter);
+app.use('/api', calculateLeaveRouter);
 app.use('/api/docChat', docChatRouter);
-app.use('/api/change-doc-type', changeDocTypeRouter);
-app.use('/api/quiz-manual', quizManualRouter);
+app.use('/api', changeDocTypeRouter);
+app.use('/api', quizManualRouter);
 
 // 오류 처리 미들웨어
 const multer = require('multer');

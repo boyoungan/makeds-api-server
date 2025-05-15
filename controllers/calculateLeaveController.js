@@ -65,7 +65,13 @@ exports.calculateLeave = (req, res) => {
     const start = new Date(joinDate);
     const end = leaveDate ? new Date(leaveDate) : new Date();
     const totalDays = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
-    const serviceYears = `${start.getFullYear()}-${start.getMonth() + 1}-${start.getDate()} ~ ${end.getFullYear()}-${end.getMonth() + 1}-${end.getDate()}`;
+    
+    // 근무 기간 문자열 형식으로 변경 (이전에는 serviceYears로 사용했지만 실제로는 기간 문자열)
+    const servicePeriod = `${start.getFullYear()}-${start.getMonth() + 1}-${start.getDate()} ~ ${end.getFullYear()}-${end.getMonth() + 1}-${end.getDate()}`;
+    
+    // 실제 근무 년수 계산 (10진수 형태로)
+    const serviceYears = (totalDays / 365).toFixed(1);
+    
     const isUnderOneYear = (end.getFullYear() - start.getFullYear()) < 1 || (end - start) < 365 * 24 * 60 * 60 * 1000;
 
     // 연차 계산 (기존 함수 활용)
@@ -86,6 +92,7 @@ exports.calculateLeave = (req, res) => {
       success: true,
       joinBased: {
         serviceYears,
+        servicePeriod,  // 근무기간 문자열 추가
         totalDays,
         annualLeave,
         usedDays,
@@ -99,6 +106,7 @@ exports.calculateLeave = (req, res) => {
       fiscalBased: {
         // 실제 회계연도 기준 로직이 필요하다면 별도 구현, 일단 joinBased와 동일하게 반환
         serviceYears,
+        servicePeriod,  // 근무기간 문자열 추가
         totalDays,
         annualLeave,
         usedDays,

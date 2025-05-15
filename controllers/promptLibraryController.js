@@ -244,14 +244,14 @@ exports.savePost = async (req, res) => {
     }
     
     // Jekyll 빌드 실행 (draft가 아닌 경우)
-    if (!isDraft) {
-      exec(`cd "${BLOG_ROOT}" && bundle exec jekyll build`, (error, stdout, stderr) => {
-        if (error) {
-          console.error('Jekyll 빌드 오류:', error);
-          console.error('표준 에러:', stderr);
-        }
-      });
-    }
+    // if (!isDraft) {
+    //   exec(`cd "${BLOG_ROOT}" && bundle exec jekyll build`, (error, stdout, stderr) => {
+    //     if (error) {
+    //       console.error('Jekyll 빌드 오류:', error);
+    //       console.error('표준 에러:', stderr);
+    //     }
+    //   });
+    // }
     
     res.json({ 
       success: true, 
@@ -360,12 +360,12 @@ exports.deletePost = async (req, res) => {
     await updatePromptData();
     
     // Jekyll 빌드 실행
-    exec(`cd "${BLOG_ROOT}" && bundle exec jekyll build`, (error, stdout, stderr) => {
-      if (error) {
-        console.error('Jekyll 빌드 오류:', error);
-        console.error('표준 에러:', stderr);
-      }
-    });
+    // exec(`cd "${BLOG_ROOT}" && bundle exec jekyll build`, (error, stdout, stderr) => {
+    //   if (error) {
+    //     console.error('Jekyll 빌드 오류:', error);
+    //     console.error('표준 에러:', stderr);
+    //   }
+    // });
     
     res.json({ 
       success: true, 
